@@ -8,13 +8,9 @@ Created on Wed Aug 19 20:57:08 2020
 import pandas as pd
 import pandas_datareader.data as web
 
-import numpy as np
-
 import matplotlib.pyplot as plt
 
 from datetime import datetime
-
-import os
 
 # API key is being pulled from a seperate config.py file
 import config
@@ -47,13 +43,14 @@ def get_symbols(symbols, data_source, begin_date, end_date=today):
         out.append(df.sort_index())
     return out
 
-symbol_path = """ INSERT YOUR PATH HERE """
-symbol_list = os.listdir(symbol_path) # It is recommended that this list is shortened at first in order to speed up testing
-
+symbol_path = """INSERT YOUR PATH HERE"""
+sp500 = pd.read_csv(symbol_path, 'sp500tickers.csv', engine='python')
 symbols = []
-for i in symbol_list:
-    symbol = i.replace('.csv','')
-    symbols.append(symbol)
+
+for i in sp500.Symbol:
+    symbols.append(i)  
+# It is recommended that this list is shortened at first in order to speed up testing
+
 
 #%%
 
@@ -64,7 +61,6 @@ profit_list = []
 total_profit = []
 
 def strategy():
-
     """
     This function sifts through a database of stocks and pulls historical
     price data. It then implements a trading strategy of buying if the opening
@@ -120,5 +116,4 @@ def strategy():
     plt.legend()
     plt.show()
 
-# The following initiates the program
 strategy()
