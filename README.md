@@ -1,4 +1,4 @@
-# AlgorithmicTrading
+# Algorithmic Trading
 
 Algorithmic trading is a growing field for investors who are looking to take advantage of the power of big data and AI in order to improve their trading strategy. I am attempting to creat my own small-scale algorthmic trading platform for personal use. The platform should include the following features:
 * Loading/Handling stock data
