@@ -5,6 +5,8 @@ Created on Wed Aug 19 20:57:08 2020
 @author: sayuj
 """
 
+""" RUN THIS SECTION FIRST AND ONLY ONCE """
+
 import pandas as pd
 import pandas_datareader.data as web
 
@@ -12,10 +14,16 @@ import matplotlib.pyplot as plt
 
 from datetime import datetime
 
-# API key is being pulled from a seperate config.py file
-import config
+from dotenv import load_dotenv
 
 today = datetime.strftime(datetime.today(), "%Y-%m-%d")
+
+# Adjust the dates to whatever dates you want to start and end the backtest
+BEGIN_DATE = '2009-12-31'
+END_DATE = today
+
+# Load the API key from a .env file
+load_dotenv()
 
 # The following function extracts stock data from a specific data source
 # (CSV, API, JSON, etc.)
@@ -36,84 +44,88 @@ def get_symbols(symbols, data_source, begin_date, end_date=today):
     
     out = []
     for symbol in symbols:
-        df = web.DataReader(symbol, data_source, begin_date, end_date, api_key=config.api_key)\
+        df = web.DataReader(symbol, data_source, begin_date, end_date, api_key=os.getenv('API_KEY'))\
         [['AdjOpen','AdjHigh','AdjLow','AdjClose','AdjVolume']].reset_index()
         df.columns = ['Date','Open','High','Low',symbol,'Volume']
         df = df[::-1].reset_index()
         out.append(df.sort_index())
     return out
 
-symbol_path = """INSERT YOUR PATH HERE"""
-sp500 = pd.read_csv(symbol_path, 'sp500tickers.csv', engine='python')
-symbols = []
+data = pd.read_csv('sp500tickers.csv', engine='python')
+sp500 = {}
 
-for i in sp500.Symbol:
-    symbols.append(i)  
-# It is recommended that this list is shortened at first in order to speed up testing
-
+# The following may take a few minutes due to the large list of stock data that must be loaded
+for symbol in data.Symbol:
+    try:
+        df = get_symbols([symbol], 'quandl',
+                        BEGIN_DATE, END_DATE)
+        sp500[symbol] = df
+        print(symbol, 'Loaded')
+    except:
+        print(f'An error occured getting the symbol for {symbol}')
+        continue
 
 #%%
 
+# Set how many days you want to conduct the backtest for
+LOOKBACK_PERIOD = 10
+
+cost = {}
 buy = []
 sell = []
-holdings = []
-profit_list = []
-total_profit = []
+holdings = set()
 
-def strategy():
+# The following function uses the database of stock data loaded above to implement a given trading strategy and report the backtest results
+# The strategy involved buying a stock if the current day's opening price is greater than the previous day's closing price and selling if vice versa
+def strategy(days, symbols):
+    
     """
-    This function sifts through a database of stocks and pulls historical
-    price data. It then implements a trading strategy of buying if the opening
-    price is greater than the previous day's closing price and sell if vice
-    versa. This strategy is checked daily. The user may indicate how many days
-    back they would like to backtest.
+    Parameters
+    ----------
+    days : lookback period in days that the user would like to backtest for
+    symbols: a dictionary of stock tickers and pricing data
+    
+    Returns
+    -------
+    The shares of stock that were bought and sold each day, as well as all
+    shares currently being held in the portfolio. Up-to-date profit and loss
+    is also reported each day. A graph outlining overall profitability of the
+    strategy is generated at the very end of the backtest.
     """
     
-    day = 1
-    while day <= 10: # This is a placeholder for testing purposes only. The value would be much larger depending on how many days one wants to backtest for
+    total_profits = []
+    for day in range(days):
+        
+        PnL = 0
+        
         print('Day {}'.format(day))
-        for i in symbols:
-            try:
-                df = get_symbols([i],data_source='quandl',\
-                                         begin_date='2009-12-31', end_date=today)
-                # print('{} Loaded'.format(i))
-                open_price = df[0].iloc[day]['Open']
-                close_price = df[0].iloc[day - 1][i]
-                
-                if open_price > close_price:
-                    if i not in holdings:
-                        buy.append(i)
-                        holdings.append(i)
-                        cost = open_price
-                    
-                elif open_price < close_price:
-                    if i in holdings:
-                        sell.append(i)
-                        holdings.remove(i)
-                        profit = open_price - cost
-                        profit_list.append(profit)
-                
-            except:
-                pass
-            
+        for symbol in symbols:
+            open_price = symbols.get(symbol)[0].iloc[day]['Open']
+            close_price = symbols.get(symbol)[0].iloc[day-1][symbol]
+
+            if open_price > close_price and symbol not in holdings:
+                buy.append(symbol)
+                holdings.add(symbol)
+                cost[symbol] = open_price
+
+            elif open_price < close_price and symbol in holdings:
+                sell.append(symbol)
+                holdings.remove(symbol)
+                profit = open_price - cost.get(symbol)
+                PnL += profit
+
         print('Current Holdings: ', holdings)
         print('Bought: ', buy)
         print('Sold: ', sell)
-        
-        PnL = sum(profit_list)
         print('PnL: ', PnL)
-        total_profit.append(PnL)
-        
-        buy.clear()
-        sell.clear()
-
-        day += 1
-
+        total_profits.append(PnL)
+    
     plt.figure(figsize=(14, 5), dpi=100)
-    plt.plot(range(1,day), total_profit)
+    plt.plot(range(0, days), total_profits)
     plt.xlabel('Day')
     plt.ylabel('PnL')
+    plt.title('Portfolio Profit and Loss')
     plt.legend()
     plt.show()
-
-strategy()
+    
+strategy(LOOKBACK_PERIOD, sp500)
