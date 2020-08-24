@@ -118,4 +118,4 @@ def get_orders():
 
 orders = get_orders()
 
-print(orders)
+print(positions)
